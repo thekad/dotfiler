@@ -1,6 +1,23 @@
 #!/usr/bin/env python
 #
-# Just a small script to bootstrap your dot files in your ~
+'''
+Just a small script to bootstrap your dot files in your ~
+
+The program will receive a "source" directory where to pull the files 
+from, it will then try to link from within your HOME directory to 
+the target file in the source directory (appending a dot at the start)
+like this:
+    The link ~/.something will point to /your/source/path/something
+The program can also skip certain files based on a flag (glob expanded)
+and will skip any file that is a symlink already. From those files that
+will be linked, it will create a backup copy in your HOME dir in the
+following manner:
+    The file ~/.something will be moved to ~/something.dotfiler
+If you want to later delete all those files just:
+    rm -rf ~/*.dotfiler
+The script will run in "dry run" mode unless you set the commit flag
+'''
+
 #
 # Copyright (c) 2010, Jorge A Gallegos <kad@blegh.net>
 #
