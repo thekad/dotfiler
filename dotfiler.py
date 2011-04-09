@@ -41,55 +41,95 @@ import sys
 
 class DotFiler(object):
 
-    def __init__(self, commit=False):
+    def __init__(self, base, commit=False, backup=True):
+        self.base = base
         self.commit = commit
+        self.backup = backup
 
-    def run(self, source_dir, skip_files=[]):
-        src = os.path.realpath(source_dir)
-        skip = []
-        for sk in skip_files:
-            skip.extend(glob.glob(os.path.join(src, sk)))
-        listing = os.listdir(src)
-        maxlen = len(max(listing, key=len))
-        for filename in listing:
-            source = os.path.join(src, filename)
-            if source in skip:
-                print 'Skipping ~/.%s' % filename
-            else:
-                link = os.path.join('%s/.%s' % (os.path.expanduser('~'), filename))
-                backup = os.path.join('%s/%s.dotfiler' % (os.path.expanduser('~'), filename))
-                if os.path.exists(link):
-                    if os.path.islink(link):
-                        print 'Skipping ~/.%s (already a link)' % filename
+    def _norm(self, root, item):
+        """Normalize paths"""
+
+#       first-level items
+        if not root:
+            item = os.path.join(self.base, '.%s' % item)
+        else:
+            item = os.path.join(self.base, '.%s' % root, item)
+        return item
+
+    def handle_dirs(self, root, dirs):
+        """Will create the proper directories"""
+
+        for d in dirs:
+            d = self._norm(root, d)
+            if self.commit:
+                try:
+                    if os.path.exists(d):
+                        print 'Skip creating %s (path already exists)' % d
                         continue
+                    os.makedirs(d)
+                except Exception as e:
+                    print 'Skip %s (Exception caught: %s)' % (d, e)
+
+    def handle_files(self, root, source, files):
+        """Will handle the file linkin"""
+
+        for f in files:
+            target = os.path.join(source, root, f)
+            link = self._norm(root, f)
+            if os.path.exists(link):
+                print 'Skip linking %s (already a link)' % link
+                continue
+            print 'Linking %s -> %s' % (link, target)
+            if self.commit:
+                try:
+                    os.symlink(target, link)
+                except Exception as e:
+                    print 'Skip %s (Exception caught: %s)' % (link, e)
+
+    def backup_root_dir(self, targets):
+        """Makes backups out of the expected files"""
+
+        for target in targets:
+            link = os.path.join(self.base, '.%s' % target)
+            backup = os.path.join(self.base, '%s.dotfiler' % target)
+            target = os.path.join(self.base, target)
+            if os.path.exists(link) and not os.path.islink(link):
+                if not os.path.exists(backup):
+                    print 'Moving %s => %s' % (link, backup)
                     if self.commit:
-                        print 'Moving   ~/.%s => ~/%s.dotfiler' % (filename.ljust(maxlen), filename)
                         try:
                             os.rename(link, backup)
                         except Exception as e:
-                            print 'Skipping ~/.%s (Cannot create backup: %s)' % (filename, e)
-                            continue
-                print 'Linking  ~/.%s -> %s' % (filename.ljust(maxlen), os.path.join(src, filename))
-                if self.commit:
-                    try:
-                        os.symlink(source, link)
-                    except Exception as e:
-                        print 'Skipping ~/.%s (Exception caught when creating link: %s)' % (filename, e)
-                        continue
-        if self.commit:
-            print 'Done.'
+                            print 'Skip %s (Exception caught: %s)' % (filename, e)
+
+    def run(self, source_dir):
+        """main loop"""
+
+        source_dir = os.path.realpath(source_dir)
+        listing = os.listdir(source_dir)
+        for root, dirs, files in os.walk(source_dir):
+            root = root.replace(source_dir, '')
+            if not root and self.backup:
+                self.backup_root_dir(dirs + files)
+            if root.startswith('/'):
+                root = root[1:]
+            self.handle_dirs(root, dirs)
+            self.handle_files(root, source_dir, files)
+        print 'Done.'
 
 
 def main():
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     ap.add_argument('--commit', '-c', action='store_true', default=False,
         help='By default, no changes will be written. Enable to write')
-    ap.add_argument('--skip', '-k', action='append', default=[],
-        help='Files you want to skip, use multiple times if you want')
+    ap.add_argument('--no-backup', '-n', action='store_true', default=False,
+        help='Do not backup stuff')
+    ap.add_argument('--base-path', '-b', default=os.path.expanduser('~'),
+        help='Base path to create the links')
     ap.add_argument('source', nargs=1, help='Path to the source directory')
     args = ap.parse_args()
-    df = DotFiler(args.commit)
-    return df.run(args.source[0], args.skip)
+    df = DotFiler(args.base_path, args.commit, not args.no_backup)
+    return df.run(args.source[0])
 
 if __name__ == '__main__':
     sys.exit(main())
