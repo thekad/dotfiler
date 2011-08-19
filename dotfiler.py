@@ -100,13 +100,12 @@ class DotFiler(object):
                         try:
                             os.rename(link, backup)
                         except Exception as e:
-                            print 'Skip %s (Exception caught: %s)' % (filename, e)
+                            print 'Skip %s (Exception caught: %s)' % (link, e)
 
     def run(self, source_dir):
         """main loop"""
 
         source_dir = os.path.realpath(source_dir)
-        listing = os.listdir(source_dir)
         for root, dirs, files in os.walk(source_dir):
             root = root.replace(source_dir, '')
             if not root and self.backup:
