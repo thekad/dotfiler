@@ -34,7 +34,6 @@ The script will run in "dry run" mode unless you set the commit flag
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import argparse
-import glob
 import os
 import sys
 
