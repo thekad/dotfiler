@@ -40,10 +40,11 @@ import sys
 
 class DotFiler(object):
 
-    def __init__(self, base, commit=False, backup=True):
+    def __init__(self, base, commit=False, backup=True, force=False):
         self.base = base
         self.commit = commit
         self.backup = backup
+        self.force = force
 
     def _norm(self, root, item):
         """Normalize paths"""
@@ -76,8 +77,12 @@ class DotFiler(object):
             target = os.path.join(source, root, f)
             link = self._norm(root, f)
             if os.path.exists(link):
-                print 'Skip linking %s (already a link)' % link
-                continue
+                if self.force:
+                    print 'Unlinking previous link %s' % link
+                    os.unlink(link)
+                else:
+                    print 'Skip linking %s (already a link)' % link
+                    continue
             print 'Linking %s -> %s' % (link, target)
             if self.commit:
                 try:
@@ -122,11 +127,13 @@ def main():
         help='By default, no changes will be written. Enable to write')
     ap.add_argument('--no-backup', '-n', action='store_true', default=False,
         help='Do not backup stuff')
+    ap.add_argument('--force', '-f', action='store_true', default=False,
+        help='Overwrite existing links')
     ap.add_argument('--base-path', '-b', default=os.path.expanduser('~'),
         help='Base path to create the links')
     ap.add_argument('source', nargs=1, help='Path to the source directory')
     args = ap.parse_args()
-    df = DotFiler(args.base_path, args.commit, not args.no_backup)
+    df = DotFiler(args.base_path, args.commit, not args.no_backup, args.force)
     return df.run(args.source[0])
 
 if __name__ == '__main__':
