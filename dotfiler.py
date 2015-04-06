@@ -63,13 +63,14 @@ class DotFiler(object):
             backup = os.path.join(self.base, '%s.dotfiler' % (stripped,))
         print 'Backing up %s to %s' % (target, backup,)
         if self.commit and self.backup:
-            os.makedirs(os.path.dirname(backup))
-            os.rename(target, backup)
+           if not os.path.isdir(os.path.dirname(backup)):
+               os.makedirs(os.path.dirname(backup))
+           os.rename(target, backup)
         else:
             pass
 
     def handle_files(self, root, source, files):
-        """Will handle the file linkin"""
+        """Will handle the file linking"""
 
         for f in files:
             target = os.path.join(source, root, f)
@@ -78,17 +79,22 @@ class DotFiler(object):
             else:
                 link = os.path.join(self.base, '.%s' % root, f)
             if os.path.exists(link):
-                self.backup_file(link)
-                if self.force:
-                    print 'Unlinking previous link %s' % link
-                    if self.commit:
-                        os.unlink(link)
+                if os.path.islink(link):
+                    if self.force:
+                        print 'Unlinking previous file/link %s' % link
+                        if self.commit:
+                            os.unlink(link)
+                    else:
+                        print 'Skip linking %s (already a link)' % link
+                        continue
                 else:
-                    print 'Skip linking %s (already exists)' % link
-                    continue
+                    self.backup_file(link)
+
             print 'Linking %s -> %s' % (link, target)
             if self.commit:
                 try:
+                    if not os.path.isdir(os.path.dirname(link)):
+                        os.makedirs(os.path.dirname(link))
                     os.symlink(target, link)
                 except Exception as e:
                     print 'Skip %s (Exception caught: %s)' % (link, e)
