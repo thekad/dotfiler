@@ -46,42 +46,45 @@ class DotFiler(object):
         self.backup = backup
         self.force = force
 
-    def _norm(self, root, item):
-        """Normalize paths"""
+    def backup_file(self, target):
+        """Backup individual file"""
 
-#       first-level items
-        if not root:
-            item = os.path.join(self.base, '.%s' % item)
+        # Perfectly valid if you don't want to backup stuff
+        if not self.backup:
+            return
+        stripped = target.replace('%s/.' % self.base, '')
+        parts = os.path.split(stripped)
+        # on root-level files, the first item is ''
+        if parts[0]:
+            topdir = parts[0]
+            stripped = stripped.replace(topdir, '%s.dotfiler' % (topdir,))
+            backup = os.path.join(self.base, stripped)
         else:
-            item = os.path.join(self.base, '.%s' % root, item)
-        return item
-
-    def handle_dirs(self, root, dirs):
-        """Will create the proper directories"""
-
-        for d in dirs:
-            d = self._norm(root, d)
-            if self.commit:
-                try:
-                    if os.path.exists(d):
-                        print 'Skip creating %s (path already exists)' % d
-                        continue
-                    os.makedirs(d)
-                except Exception as e:
-                    print 'Skip %s (Exception caught: %s)' % (d, e)
+            backup = os.path.join(self.base, '%s.dotfiler' % (stripped,))
+        print 'Backing up %s to %s' % (target, backup,)
+        if self.commit and self.backup:
+            os.makedirs(os.path.dirname(backup))
+            os.rename(target, backup)
+        else:
+            pass
 
     def handle_files(self, root, source, files):
         """Will handle the file linkin"""
 
         for f in files:
             target = os.path.join(source, root, f)
-            link = self._norm(root, f)
+            if not root:
+                link = os.path.join(self.base, '.%s' % f)
+            else:
+                link = os.path.join(self.base, '.%s' % root, f)
             if os.path.exists(link):
+                self.backup_file(link)
                 if self.force:
                     print 'Unlinking previous link %s' % link
-                    os.unlink(link)
+                    if self.commit:
+                        os.unlink(link)
                 else:
-                    print 'Skip linking %s (already a link)' % link
+                    print 'Skip linking %s (already exists)' % link
                     continue
             print 'Linking %s -> %s' % (link, target)
             if self.commit:
@@ -90,33 +93,14 @@ class DotFiler(object):
                 except Exception as e:
                     print 'Skip %s (Exception caught: %s)' % (link, e)
 
-    def backup_root_dir(self, targets):
-        """Makes backups out of the expected files"""
-
-        for target in targets:
-            link = os.path.join(self.base, '.%s' % target)
-            backup = os.path.join(self.base, '%s.dotfiler' % target)
-            target = os.path.join(self.base, target)
-            if os.path.exists(link) and not os.path.islink(link):
-                if not os.path.exists(backup):
-                    print 'Moving %s => %s' % (link, backup)
-                    if self.commit:
-                        try:
-                            os.rename(link, backup)
-                        except Exception as e:
-                            print 'Skip %s (Exception caught: %s)' % (link, e)
-
     def run(self, source_dir):
         """main loop"""
 
         source_dir = os.path.realpath(source_dir)
         for root, dirs, files in os.walk(source_dir):
             root = root.replace(source_dir, '')
-            if not root and self.backup:
-                self.backup_root_dir(dirs + files)
             if root.startswith('/'):
                 root = root[1:]
-            self.handle_dirs(root, dirs)
             self.handle_files(root, source_dir, files)
         print 'Done.'
 
